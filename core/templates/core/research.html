@@ -1,0 +1,209 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Research Dashboard | NeuroVista</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --ink:#0b1b2e; --text:#e6f0ff; --muted:#9fb7d7; --accent:#3aa0ff;
+      --glass: rgba(14,34,58,.42); --glass-border: rgba(255,255,255,.18);
+    }
+    html,body{ height:100%; margin:0; }
+    body{
+      background: radial-gradient(1200px 800px at 75% 40%, #112b46 0%, var(--ink) 60%) fixed;
+      color: var(--text); font-family: 'Open Sans', sans-serif;
+    }
+    .bg-brain::before{
+      content:""; position:fixed; inset:0; z-index:-1;
+      background:
+        linear-gradient(90deg, rgba(11,27,46,.92) 0%, rgba(11,27,46,.82) 40%, rgba(11,27,46,.2) 75%, rgba(11,27,46,0) 100%),
+        url("{% static 'img/brain_bg.jpg' %}") right center / cover no-repeat;
+    }
+    .nv-shell{ min-height:100dvh; padding: 36px 16px; }
+    .nv-card{ background: var(--glass); backdrop-filter: blur(8px);
+      border: 1px solid var(--glass-border); border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25); padding: clamp(20px, 3vw, 28px); }
+    .nv-title{ font-family: 'Montserrat', sans-serif; font-weight:700; margin:0; }
+    .nv-subtle{ color: var(--muted); }
+    .btn-nv{ border-radius:12px !important; padding:12px 16px !important; font-weight:700; }
+    .btn-nv-ghost{ color: var(--text); border:1px solid rgba(255,255,255,.35); background: transparent; }
+    .btn-nv-ghost:hover{ background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.55); }
+    .filter-pills .btn{ border-radius:999px; padding:8px 14px; font-weight:600; }
+    .filter-pills .btn-outline{ color:var(--text); border:1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.04); }
+    .filter-pills .btn-outline:hover{ background: rgba(255,255,255,.10); }
+    .filter-pills .btn-active{ background:var(--accent); border-color:var(--accent); color:#061320; box-shadow:0 6px 18px rgba(58,160,255,.22); }
+    .chip{ background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:12px 14px; }
+    .chart-box{ height:340px; border-radius:12px; border:1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04); padding:8px; }
+    .nv-table-wrap{ border-radius:14px; overflow:hidden; border:1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04); }
+    .table.nv-table{ margin:0; color:#e9f1ff; }
+    .table.nv-table thead th{ background: rgba(255,255,255,.06); color:#cfe3ff; border-color: rgba(255,255,255,.12); }
+    .table.nv-table tbody td{ border-color: rgba(255,255,255,.08); }
+    .table.nv-table tbody tr:hover{ background: rgba(255,255,255,.06); }
+    .table.nv-table th,.table.nv-table td{ vertical-align: middle; padding:10px 12px; font-size:.95rem; }
+  </style>
+</head>
+<body class="bg-brain">
+
+<div class="nv-shell container">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h2 class="nv-title">🔬 MRI Research Dashboard</h2>
+    <div class="d-flex gap-2">
+      <a href="{% url 'batch_upload' %}" class="btn btn-nv btn-nv-ghost">📦 Batch Upload</a>
+      <a href="{% url 'home' %}" class="btn btn-nv btn-nv-ghost">← Home</a>
+    </div>
+  </div>
+  <p class="nv-subtle mb-4">Explore detections, classifications, and dataset trends.</p>
+
+  <div class="nv-card mb-4">
+    <div class="row g-3 align-items-center">
+      <div class="col-lg-6">
+        <div class="nv-subtle mb-2">Filter by Gender</div>
+        <div class="filter-pills d-flex gap-2 flex-wrap" id="genderPills">
+          <button type="button" class="btn btn-outline btn-active" data-gender="All">All</button>
+          <button type="button" class="btn btn-outline" data-gender="Male">Male</button>
+          <button type="button" class="btn btn-outline" data-gender="Female">Female</button>
+          <button type="button" class="btn btn-outline" data-gender="Other">Other</button>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="row g-2">
+          <div class="col-4"><div class="chip text-center"><div class="small nv-subtle">Total Records</div><div class="fs-5 fw-bold"><span id="kpiTotal">{{ patients|length }}</span></div></div></div>
+          <div class="col-4"><div class="chip text-center"><div class="small nv-subtle">Detections: Yes</div><div class="fs-5 fw-bold"><span id="kpiYes">-</span></div></div></div>
+          <div class="col-4"><div class="chip text-center"><div class="small nv-subtle">Detections: No</div><div class="fs-5 fw-bold"><span id="kpiNo">-</span></div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-md-6">
+      <div class="nv-card">
+        <h5 class="mb-2">Tumor Type Frequency</h5>
+        <div id="tumorChart" class="chart-box"></div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="nv-card">
+        <h5 class="mb-2">Detection Outcome Distribution</h5>
+        <div id="detectionChart" class="chart-box"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nv-card">
+    <h5 class="mb-3">📋 Patient Records <span class="nv-subtle">({{ patients|length }} total)</span></h5>
+    <div class="nv-table-wrap">
+      <div class="table-responsive">
+        <table class="table nv-table table-striped align-middle">
+          <thead>
+            <tr>
+              <th>ID</th><th>Name</th><th>Age</th><th>Gender</th>
+              <th>Detection</th><th>Classification</th><th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in patients %}
+            <tr>
+              <td>{{ p.id }}</td>
+              <td>{{ p.name }}</td>
+              <td>{{ p.age }}</td>
+              <td>{{ p.gender }}</td>
+              <td>{{ p.detected|default:'-' }}</td>
+              <td>{{ p.classified|default:'-' }}</td>
+              <td>{{ p.created_at|date:"Y-m-d H:i" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const tumorData = {{ tumor_counts|safe }};       
+  const detectionData = {{ detection_stats|safe }}; 
+
+  function aggregateBy(arr, key){
+    const map = new Map();
+    for (const r of arr){
+      const k = (r[key] ?? 'Unknown').toString();
+      const v = Number(r.count) || 0;
+      map.set(k, (map.get(k) || 0) + v);
+    }
+    return { labels: [...map.keys()], values: [...map.values()] };
+  }
+
+  function computeKpis(gender = 'All'){
+    const d = (gender === 'All') ? detectionData : detectionData.filter(x => x.gender === gender);
+    const agg = aggregateBy(d, 'detected');
+    const labels = agg.labels.map(s => s.toLowerCase());
+    const yesIdx = labels.indexOf('yes');
+    const noIdx  = labels.indexOf('no');
+    document.getElementById('kpiYes').textContent = yesIdx >= 0 ? agg.values[yesIdx] : 0;
+    document.getElementById('kpiNo').textContent  = noIdx >= 0 ? agg.values[noIdx]  : 0;
+  }
+
+  function drawCharts(gender = 'All'){
+    const tFiltered = (gender === 'All') ? tumorData : tumorData.filter(d => d.gender === gender);
+    const dFiltered = (gender === 'All') ? detectionData : detectionData.filter(x => x.gender === gender);
+
+    const tAgg = aggregateBy(tFiltered, 'classified');                 
+    const dAgg = aggregateBy(dFiltered.map(r => ({...r, detected: (r.detected || 'UNK').toUpperCase()})), 'detected');
+    const tumorTrace = {
+      x: tAgg.labels,
+      y: tAgg.values,
+      type: 'bar',
+      marker: { color: '#3aa0ff' },
+      hovertemplate: '%{x}: %{y}<extra></extra>'
+    };
+    const tumorLayout = {
+      title: 'Tumor Type Frequency',
+      margin:{t:30,l:60,r:10,b:40},
+      paper_bgcolor:'rgba(0,0,0,0)',
+      plot_bgcolor:'rgba(0,0,0,0)',
+      font:{ color:'#e6f0ff' },
+      xaxis:{ tickangle:-15, gridcolor:'rgba(255,255,255,.08)' },
+      yaxis:{ title:{ text:'Count' }, gridcolor:'rgba(255,255,255,.08)' }
+    };
+    Plotly.newPlot('tumorChart', [tumorTrace], tumorLayout, {displayModeBar:false});
+    const detectTrace = {
+      labels: dAgg.labels,
+      values: dAgg.values,
+      type:'pie',
+      hole:.45,                                
+      textinfo:'label+percent',                 
+      textposition:'inside',
+      insidetextorientation:'horizontal',
+      textfont:{ color:'#ffffff', size:14 },     
+      hovertemplate: '%{label}: %{value} (%{percent})<extra></extra>'
+    };
+    const detectLayout = {
+      margin:{t:10,l:10,r:10,b:10},
+      paper_bgcolor:'rgba(0,0,0,0)',
+      font:{ color:'#e6f0ff' },
+      legend:{ orientation:'h', x:0, y:-0.05 }
+    };
+    Plotly.newPlot('detectionChart', [detectTrace], detectLayout, {displayModeBar:false});
+  }
+  document.getElementById('genderPills').addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-gender]');
+    if (!btn) return;
+    [...document.querySelectorAll('#genderPills button')].forEach(b => b.classList.remove('btn-active'));
+    btn.classList.add('btn-active');
+    const g = btn.getAttribute('data-gender');
+    computeKpis(g);
+    drawCharts(g);
+  });
+
+  computeKpis('All');
+  drawCharts('All');
+</script>
+</body>
+</html>

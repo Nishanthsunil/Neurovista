@@ -1,0 +1,222 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Segmentation | NeuroVista</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --ink:#0b1b2e;
+      --text:#e6f0ff;
+      --muted:#9fb7d7;
+      --accent:#3aa0ff;
+      --glass: rgba(14,34,58,.42);
+      --glass-border: rgba(255,255,255,.18);
+    }
+    html,body{ height:100%; margin:0; }
+    body{
+      background: radial-gradient(1200px 800px at 75% 40%, #112b46 0%, var(--ink) 60%) fixed;
+      color: var(--text);
+      font-family: 'Open Sans', sans-serif;
+    }
+    .bg-brain::before{
+      content:""; position:fixed; inset:0; z-index:-1;
+      background:
+        linear-gradient(90deg, rgba(11,27,46,.92) 0%, rgba(11,27,46,.82) 40%, rgba(11,27,46,.2) 75%, rgba(11,27,46,0) 100%),
+        url("{% static 'img/brain_bg.jpg' %}") right center / cover no-repeat;
+    }
+    .nv-shell{ min-height:100dvh; padding: 36px 16px; }
+    .nv-card{
+      background: var(--glass);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--glass-border);
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      padding: clamp(20px, 3vw, 28px);
+    }
+    .nv-title{ font-family: 'Montserrat', sans-serif; font-weight:700; letter-spacing:.5px; margin:0; }
+    .nv-subtle{ color: var(--muted); }
+    .btn-nv{ border-radius:12px !important; padding:12px 16px !important; font-weight:700; }
+    .btn-nv-primary{ background: var(--accent); border:1px solid var(--accent); color:#061320; box-shadow: 0 6px 18px rgba(58,160,255,.22); }
+    .btn-nv-ghost{ color: var(--text); border:1px solid rgba(255,255,255,.35); background: transparent; }
+    .btn-nv-ghost:hover{ background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.55); }
+
+    .chip{
+      background: rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+    .preview-frame{
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.04);
+      border-radius: 12px;
+      display:flex; align-items:center; justify-content:center;
+      height: 320px;
+      max-width: 100%;
+      overflow:hidden;
+    }
+    .preview-frame img, .preview-frame canvas{
+      width: 100%; height: 100%;
+      object-fit: contain;
+      border-radius: 10px;
+    }
+    @media (max-width: 1200px){ .preview-frame{ height: 300px; } }
+    @media (max-width: 768px){ .preview-frame{ height: 260px; } }
+
+    
+    .subhead{
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: #e6f0ff;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255,255,255,.12);
+      text-align: center;
+    }
+
+    .range-row{ display:flex; align-items:center; gap:10px; justify-content:center; }
+    .form-range{ max-width: 260px; }
+    .form-range::-webkit-slider-thumb{ background-color: var(--accent); }
+    .form-range::-moz-range-thumb{ background-color: var(--accent); }
+  </style>
+</head>
+<body class="bg-brain">
+
+<div class="nv-shell container">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h2 class="nv-title">Tumor Segmentation</h2>
+    <a href="{% url 'home' %}" class="btn btn-nv btn-nv-ghost">← Home</a>
+  </div>
+  <p class="nv-subtle mb-4">Segmentation results and visual explanations for {{ patient.name }}.</p>
+
+  <div class="row g-4">
+    <div class="col-lg-4">
+      <div class="nv-card h-100">
+        <h5 class="mb-3">Patient & Metrics</h5>
+        <div class="mb-2"><strong>Patient:</strong> {{ patient.name }}</div>
+        <div class="mb-2"><strong>Age:</strong> {{ patient.age }}</div>
+        <div class="mb-3"><strong>Gender:</strong> {{ patient.gender }}</div>
+
+        <div class="row g-2">
+          <div class="col-12">
+            <div class="chip d-flex justify-content-between">
+              <span>Tumor Area (pixels)</span>
+              <strong>{{ tumor_area|default:"-" }}</strong>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="chip d-flex justify-content-between">
+              <span>Tumor Center</span>
+              <strong>
+                {% if tumor_center.0 != -1 and tumor_center.1 != -1 %}
+                  ({{ tumor_center.0 }}, {{ tumor_center.1 }})
+                {% else %}
+                  Not detected
+                {% endif %}
+              </strong>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="chip d-flex justify-content-between">
+              <span> Confidence</span>
+              <strong>{{ confidence|floatformat:3 }}</strong>
+            </div>
+          </div>
+        </div>
+
+        <small class="nv-subtle d-block mt-2">
+          * Area estimated in pixels (assumes 0.5mm × 0.5mm ≈ 0.25&nbsp;mm² per pixel).
+        </small>
+
+        <hr class="border-light">
+
+        <div class="d-grid gap-2">
+          <form method="get" action="{% url 'register' %}">
+            <button type="submit" class="btn btn-nv btn-nv-primary w-100">✅ Save & Register Next Patient</button>
+          </form>
+          <a href="{% url 'home' %}" class="btn btn-nv btn-nv-ghost w-100">← Back to Home</a>
+        </div>
+
+        <div class="alert alert-success mt-3 mb-0" role="alert" style="background: rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); color:#d3ffe2; border-radius:12px;">
+          Patient record saved. Ready for the next one.
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="nv-card h-100">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="subhead">Original MRI</div>
+            <div class="preview-frame">
+              <img src="{{ patient.mri_image.url }}" alt="MRI Image">
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="subhead">Mask</div>
+            <div class="preview-frame">
+              <canvas id="overlayCanvas" width="320" height="320"></canvas>
+            </div>
+            <div class="mt-2 range-row">
+              <label for="opacitySlider" class="m-0 nv-subtle small">Opacity</label>
+              <input type="range" id="opacitySlider" class="form-range" min="0" max="1" step="0.01" value="0.5">
+              <span id="opacityValue" class="nv-subtle small">0.50</span>
+            </div>
+          </div>
+
+
+          <div class="col-md-4">
+            <div class="subhead">Grad-CAM</div>
+            <div class="preview-frame">
+              <img src="/media/{{ gradcam_path }}" alt="Grad-CAM">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+   
+  </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  const canvas = document.getElementById('overlayCanvas');
+  const ctx = canvas ? canvas.getContext('2d') : null;
+  const opacitySlider = document.getElementById('opacitySlider');
+  const opacityValue  = document.getElementById('opacityValue');
+
+  const baseImg = new Image();
+  const maskImg = new Image();
+
+  if (canvas && ctx) {
+    baseImg.src = "{{ patient.mri_image.url }}";
+    maskImg.src = "/media/{{ patient.segmented }}";
+
+    function drawOverlay(opacity){
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(baseImg, 0, 0, canvas.width, canvas.height);
+      ctx.globalAlpha = opacity;
+      ctx.drawImage(maskImg, 0, 0, canvas.width, canvas.height);
+      ctx.globalAlpha = 1;
+    }
+
+    let ready = { base: false, mask: false };
+    baseImg.onload = () => { ready.base = true; if (ready.mask) drawOverlay(parseFloat(opacitySlider.value)); };
+    maskImg.onload = () => { ready.mask = true; if (ready.base) drawOverlay(parseFloat(opacitySlider.value)); };
+
+    opacitySlider.addEventListener('input', e=>{
+      const v = parseFloat(e.target.value || '0.5');
+      opacityValue.textContent = v.toFixed(2);
+      drawOverlay(v);
+    });
+  }
+</script>
+
+</body>
+</html>
